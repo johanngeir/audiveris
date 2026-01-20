@@ -1,0 +1,105 @@
+# Audiveris — Deep Context
+
+> Load this file when debugging, understanding architecture, or working on specific issues.
+> Core context: `AGENTS.md`
+
+## Conventions
+
+- **Java 25** minimum (set in `gradle.properties`)
+- **4-space indent**, 100-char line limit (Jalopy Sun convention)
+- **JAXB** for XML serialization (`.omr` project files)
+- **SLF4J + Logback** for logging
+- **EventBus** for decoupled event handling
+- Resources in `app/res/` NOT `src/main/resources/`
+- Generated source: `app/build/generated-src/` (ProgramId.java)
+
+## Unique Styles
+
+- **Inter** classes: Music symbol interpretations with grades (0-1)
+- **Relation** classes: Graph edges linking Inters (Support/Exclusion)
+- **Constant** pattern: `Constant.Integer`, `Constant.Double` for user-tweakable params
+- **Shape** enum: ~600 music symbol types
+- **AbstractEntity** base: Most domain objects extend this
+
+## Debug Visualization
+
+The `-debug-images <folder>` flag generates PNG overlays at each processing step with color-coded bounding boxes:
+
+| Color | Category |
+|-------|----------|
+| Red | Note heads |
+| Green | Stems |
+| Blue | Beams |
+| Orange | Rests |
+| Purple | Clefs |
+| Pink | Key signatures |
+| Cyan | Time signatures |
+| Yellow | Flags |
+| Brown | Barlines |
+| Deep pink | Slurs/ties |
+| Turquoise | Text/lyrics |
+| Gray | Other |
+
+**Output files:**
+- 20 step images: `*_load.png`, `*_binary.png`, ..., `*_page.png`
+- Final composite: `*_final.png`
+- JSON report: `*_report.json` (counts and avg confidence per category)
+
+## OCR Toggle
+
+**Constant:** `org.audiveris.omr.text.tesseract.TesseractOCR.useOCR`
+
+Disabling OCR (`useOCR=false`) has been observed to **improve note detection**:
+
+| Category | With OCR | No OCR |
+|----------|----------|--------|
+| HEAD | 175 | 341 (+95%) |
+| STEM | 175 | 293 (+67%) |
+| TEXT | 211 | 27 (-87%) |
+
+**Hypothesis:** OCR bounding boxes overlap with noteheads, causing the classifier to miss notes. For instrumental-focused processing (playback accuracy), disable OCR.
+
+## Notes
+
+- **Large files**: `PartwiseBuilder.java` (3885 lines), `Book.java` (3086), `BookActions.java` (2835) - complexity hotspots
+- **Tesseract native libs**: Loaded via Javacpp, requires `--enable-native-access=ALL-UNNAMED`
+- **Cross-platform**: Builds for Windows (.msi), Linux (.deb), macOS (.dmg)
+- **Offline mode**: Flatpak uses `dependencies/` folder for air-gapped builds
+
+## Known Issues: Lyrics Zone False Detection
+
+Lyrics (especially i-dots and j-dots from words like "rið", "leið", "mín-a") can be misclassified as musical symbols when they appear between voice staves.
+
+### Fixed
+
+| Inter Class | False Detection | Fix Location |
+|-------------|-----------------|--------------|
+| `ArticulationInter` | i-dots → staccato | `createValidAdded()` - lyrics zone + text proximity check |
+| `OrnamentInter` | i-dots → trill | `createValidAdded()` - lyrics zone + text proximity check |
+| `DynamicsInter` | syllables → p, f, mp, mf | `lookupLink()` - lyrics zone check |
+
+### Potentially Affected (not yet observed)
+
+| Inter Class | Potential False Detection | Has `createValidAdded`/`lookupLink` |
+|-------------|---------------------------|-------------------------------------|
+| `FermataInter` | dots → fermata | Yes |
+| `FingeringInter` | numbers → fingering | Yes |
+| `BowInter` | dots → bowing marks | Yes |
+| `PluckingInter` | symbols → plucking | Yes |
+| `PlayingInter` | symbols → playing technique | Yes |
+
+### Fix Pattern
+
+Reject symbols in the "lyrics zone" (center Y > staff bottom + 1 interline):
+
+```java
+final Point center = getCenter();
+final int interline = system.getSheet().getScale().getInterline();
+final Staff staff = system.getClosestStaff(center);
+if (staff != null) {
+    final int staffBottom = staff.getLastLine().yAt(center.x);
+    if (center.y > staffBottom + interline) {
+        return null;  // In lyrics zone
+    }
+}
+```

@@ -1,195 +1,67 @@
-# AUDIVERIS - PROJECT KNOWLEDGE BASE
+# Audiveris
 
-> **Workspace:** `../../AGENTS.md` | **Tracking:** `../../shared/TRACKING.md` | **Test files:** `../../shared/SHEET_MUSIC.md`
+> **Workspace:** `../../AGENTS.md` | **Deep context:** `AGENTS-DEEP.md`
+> **Fork of:** `Audiveris/audiveris` → `johanngj/audiveris`
 
-**Generated:** 2026-01-17
-**Commit:** e8e303ee8
-**Branch:** johann
+Open-source OMR (Optical Music Recognition): PDF → MusicXML. Java, Swing UI, neural net classifier, Tesseract OCR.
 
-## PROJECT GOALS
+**Goals:** Perfect playback (pitches, rhythms, durations) for TTBB choral + piano. Fully automated.
 
-**Primary:** PDF → MusicXML with perfect playback (correct pitches, rhythms, durations)
+## Fork Workflow
 
-**Secondary:** + correct visual rendering (stems, beams, articulations, dynamics)
+```bash
+# Sync with upstream
+git fetch upstream && git merge upstream/master
 
-**Tertiary:** + correct lyrics
+# Push your changes
+git push origin <branch>
+```
 
-**Constraint:** Fully automated, no human correction required
-
-**Target repertoire:** TTBB choral and TTBB choral with piano
-
-## OVERVIEW
-
-Audiveris is an open-source **Optical Music Recognition (OMR)** application that transcribes scanned sheet music into MusicXML. Built as a Swing desktop app with a neural network classifier and Tesseract OCR integration.
-
-## STRUCTURE
+## Structure
 
 ```
 Audiveris/
-├── app/                    # Main application (see app/AGENTS.md)
-│   └── src/main/java/org/audiveris/omr/
-│       ├── sig/            # Symbol Interpretation Graph (see sig/AGENTS.md)
-│       ├── sheet/          # Sheet processing pipeline (see sheet/AGENTS.md)
-│       ├── ui/             # Swing UI layer (see ui/AGENTS.md)
-│       └── ...             # Other packages documented in app/
-├── docs/                   # Handbook (Jekyll + PDF via Prince)
-├── flatpak/                # Linux Flatpak packaging
-├── packaging/              # Cross-platform installers (jpackage)
-└── schemas/                # XSD schema documentation
+├── app/src/main/java/org/audiveris/omr/
+│   ├── sig/            # Symbol Interpretation Graph (core data)
+│   ├── sheet/          # Sheet processing pipeline
+│   ├── score/          # MusicXML export (ProxyMusic)
+│   └── ui/             # Swing UI
+├── docs/               # Handbook (Jekyll)
+└── packaging/          # Cross-platform installers
 ```
 
-## WHERE TO LOOK
+## Where to Look
 
-| Task | Location | Notes |
-|------|----------|-------|
-| Entry point | `app/.../Audiveris.java`, `Main.java` | CLI in `CLI.java` |
-| Domain model | `sig/inter/`, `sig/relation/` | SIG = core data structure |
-| Image processing | `image/`, `sheet/` | Morphology, filtering |
-| Symbol recognition | `classifier/`, `glyph/` | Neural net in `basic-classifier.zip` |
-| OCR integration | `text/` | Tesseract via Javacpp |
-| MusicXML export | `score/` | Uses ProxyMusic library |
-| Sheet pipeline | `step/` | Processing steps sequence |
-| Configuration | `constant/` | Persistent user settings |
+| Task | Location |
+|------|----------|
+| Entry point | `Audiveris.java`, `Main.java`, `CLI.java` |
+| Domain model | `sig/inter/`, `sig/relation/` |
+| Symbol recognition | `classifier/`, `glyph/` |
+| MusicXML export | `score/` (ProxyMusic) |
+| Processing steps | `step/` |
 
-## CONVENTIONS
-
-- **Java 25** minimum (set in `gradle.properties`)
-- **4-space indent**, 100-char line limit (Jalopy Sun convention)
-- **JAXB** for XML serialization (`.omr` project files)
-- **SLF4J + Logback** for logging
-- **EventBus** for decoupled event handling
-- Resources in `app/res/` NOT `src/main/resources/`
-- Generated source: `app/build/generated-src/` (ProgramId.java)
-
-## ANTI-PATTERNS (THIS PROJECT)
-
-- **DO NOT** use `src/main/resources/` - use `app/res/` instead
-- **DO NOT** instantiate via `class.newInstance()` - deprecated
-- **AVOID** JGoodies PanelBuilder - legacy, use alternatives
-- **AVOID** Observer/Observable - use PropertyChangeListener
-- Tests exclude: `**/org/audiveris/omr/jaxb/basic/**`, `**/jaxb/facade/**`
-
-## UNIQUE STYLES
-
-- **Inter** classes: Music symbol interpretations with grades (0-1)
-- **Relation** classes: Graph edges linking Inters (Support/Exclusion)
-- **Constant** pattern: `Constant.Integer`, `Constant.Double` for user-tweakable params
-- **Shape** enum: ~600 music symbol types
-- **AbstractEntity** base: Most domain objects extend this
-
-## COMMANDS
+## Commands
 
 ```bash
-# Build
-./gradlew build
-
-# Run application
-./gradlew run
-
-# Run with custom args
+./gradlew build              # Build
+./gradlew run                # Run GUI
 ./gradlew run -PcmdLineArgs="--help"
 
-# Run specific main class
-./gradlew run -PmainClass=org.audiveris.omr.SomeClass
+# Batch transcribe
+./app/build/install/app/bin/Audiveris -batch -export -transcribe input.pdf
 
-# Debug
-./gradlew debug
+# With debug images
+./app/build/install/app/bin/Audiveris -batch -debug-images /tmp/debug -export -transcribe input.pdf
 
-# Generate JavaDoc
-./gradlew javadoc
-
-# Build installers (requires jpackage)
-./gradlew :packaging:jpackage
-
-# Generate Flatpak dependencies
-./gradlew :app:flatpakGradleGenerator
-
-# Batch transcribe with debug visualization
-./app/build/install/app/bin/Audiveris -batch -debug-images /tmp/debug-output -export -transcribe input.pdf
-
-# Disable OCR (improves note detection for instrumental-focused processing)
+# Disable OCR (often improves note detection)
 ./app/build/install/app/bin/Audiveris -batch -constant org.audiveris.omr.text.tesseract.TesseractOCR.useOCR=false -export -transcribe input.pdf
 ```
 
-## DEBUG VISUALIZATION
+## Anti-Patterns
 
-The `-debug-images <folder>` flag generates PNG overlays at each processing step with color-coded bounding boxes:
+- ❌ Use `src/main/resources/` (use `app/res/` instead)
+- ❌ `class.newInstance()` (deprecated)
+- ❌ JGoodies PanelBuilder (legacy)
+- ❌ Observer/Observable (use PropertyChangeListener)
 
-| Color | Category |
-|-------|----------|
-| Red | Note heads |
-| Green | Stems |
-| Blue | Beams |
-| Orange | Rests |
-| Purple | Clefs |
-| Pink | Key signatures |
-| Cyan | Time signatures |
-| Yellow | Flags |
-| Brown | Barlines |
-| Deep pink | Slurs/ties |
-| Turquoise | Text/lyrics |
-| Gray | Other |
-
-**Output files:**
-- 20 step images: `*_load.png`, `*_binary.png`, ..., `*_page.png`
-- Final composite: `*_final.png`
-- JSON report: `*_report.json` (counts and avg confidence per category)
-
-## OCR TOGGLE
-
-**Constant:** `org.audiveris.omr.text.tesseract.TesseractOCR.useOCR`
-
-Disabling OCR (`useOCR=false`) has been observed to **improve note detection**:
-
-| Category | With OCR | No OCR |
-|----------|----------|--------|
-| HEAD | 175 | 341 (+95%) |
-| STEM | 175 | 293 (+67%) |
-| TEXT | 211 | 27 (-87%) |
-
-**Hypothesis:** OCR bounding boxes overlap with noteheads, causing the classifier to miss notes. For instrumental-focused processing (playback accuracy), disable OCR.
-
-## NOTES
-
-- **Large files**: `PartwiseBuilder.java` (3885 lines), `Book.java` (3086), `BookActions.java` (2835) - complexity hotspots
-- **Tesseract native libs**: Loaded via Javacpp, requires `--enable-native-access=ALL-UNNAMED`
-- **Cross-platform**: Builds for Windows (.msi), Linux (.deb), macOS (.dmg)
-- **Offline mode**: Flatpak uses `dependencies/` folder for air-gapped builds
-
-## KNOWN ISSUES: LYRICS ZONE FALSE DETECTION
-
-Lyrics (especially i-dots and j-dots from words like "rið", "leið", "mín-a") can be misclassified as musical symbols when they appear between voice staves.
-
-### Fixed
-
-| Inter Class | False Detection | Fix Location |
-|-------------|-----------------|--------------|
-| `ArticulationInter` | i-dots → staccato | `createValidAdded()` - lyrics zone + text proximity check |
-| `OrnamentInter` | i-dots → trill | `createValidAdded()` - lyrics zone + text proximity check |
-| `DynamicsInter` | syllables → p, f, mp, mf | `lookupLink()` - lyrics zone check |
-
-### Potentially Affected (not yet observed)
-
-| Inter Class | Potential False Detection | Has `createValidAdded`/`lookupLink` |
-|-------------|---------------------------|-------------------------------------|
-| `FermataInter` | dots → fermata | Yes |
-| `FingeringInter` | numbers → fingering | Yes |
-| `BowInter` | dots → bowing marks | Yes |
-| `PluckingInter` | symbols → plucking | Yes |
-| `PlayingInter` | symbols → playing technique | Yes |
-
-### Fix Pattern
-
-Reject symbols in the "lyrics zone" (center Y > staff bottom + 1 interline):
-
-```java
-final Point center = getCenter();
-final int interline = system.getSheet().getScale().getInterline();
-final Staff staff = system.getClosestStaff(center);
-if (staff != null) {
-    final int staffBottom = staff.getLastLine().yAt(center.x);
-    if (center.y > staffBottom + interline) {
-        return null;  // In lyrics zone
-    }
-}
-```
+For debugging, OCR tuning, lyrics zone issues → see `AGENTS-DEEP.md`
