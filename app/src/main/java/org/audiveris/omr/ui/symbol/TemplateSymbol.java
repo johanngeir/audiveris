@@ -81,7 +81,8 @@ public class TemplateSymbol
      */
     public Rectangle getFatBounds (MusicFont font)
     {
-        return getParams(font).rawRect.getBounds();
+        MyParams p = getParams(font);
+        return p != null ? p.rawRect.getBounds() : null;
     }
 
     //-----------//
@@ -109,6 +110,7 @@ public class TemplateSymbol
                     "TemplateSymbol. No symbol for {} in family {}",
                     shape,
                     font.getMusicFamily());
+            return null;
         }
 
         final Params symParams = symbol.getParams(font);

@@ -396,7 +396,7 @@ public class ShapeSymbol
     {
         Params p = getParams(font);
 
-        if (p.rect == null) {
+        if (p == null || p.rect == null) {
             return null;
         }
 
